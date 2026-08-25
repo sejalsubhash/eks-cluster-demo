@@ -23,15 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug GitHub OIDC
-        run: |
-          echo "Repository: $GITHUB_REPOSITORY"
-          echo "Ref: $GITHUB_REF"
-          echo "Branch: $GITHUB_REF_NAME"
-          echo "Event: $GITHUB_EVENT_NAME"
-          echo "Repository ID: $GITHUB_REPOSITORY_ID"
-          echo "Repository owner ID: $GITHUB_REPOSITORY_OWNER_ID"
-
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -46,20 +37,16 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push backend image
+      - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$BACKEND_REPO:latest ./backend
-          docker push $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG
+          docker build -t $ECR_REGISTRY/$BACKEND_REPO:latest ./backend
           docker push $ECR_REGISTRY/$BACKEND_REPO:latest
 
-      - name: Build, tag, and push frontend image
+      - name: Build and push frontend image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
-          docker push $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG
+          docker build -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
           docker push $ECR_REGISTRY/$FRONTEND_REPO:latest
