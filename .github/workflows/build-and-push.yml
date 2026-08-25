@@ -2,34 +2,45 @@ name: Build and Push to ECR
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/build-and-push.yml'
-  workflow_dispatch: {}
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
-  AWS_REGION: ap-south-1          # Mumbai — primary ECR region
+  AWS_REGION: ap-south-1
   BACKEND_REPO: dr-demo-backend
   FRONTEND_REPO: dr-demo-frontend
 
 permissions:
-  id-token: write   # needed for OIDC auth to AWS (no long-lived keys)
+  id-token: write
   contents: read
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Debug GitHub OIDC
+        run: |
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Ref: $GITHUB_REF"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Repository ID: $GITHUB_REPOSITORY_ID"
+          echo "Repository owner ID: $GITHUB_REPOSITORY_OWNER_ID"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Test AWS authentication
+        run: |
+          aws sts get-caller-identity
 
       - name: Login to Amazon ECR
         id: ecr-login
