@@ -1,0 +1,54 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/build-and-push.yml'
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: ap-south-1          # Mumbai — primary ECR region
+  BACKEND_REPO: dr-demo-backend
+  FRONTEND_REPO: dr-demo-frontend
+
+permissions:
+  id-token: write   # needed for OIDC auth to AWS (no long-lived keys)
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push backend image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$BACKEND_REPO:latest ./backend
+          docker push $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$BACKEND_REPO:latest
+
+      - name: Build, tag, and push frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
+          docker push $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$FRONTEND_REPO:latest

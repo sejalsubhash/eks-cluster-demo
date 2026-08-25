@@ -1,0 +1,14 @@
+{
+  "name": "dr-demo-backend",
+  "version": "1.0.0",
+  "description": "Simple backend for EKS Mumbai-Ohio DR demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mysql2": "^3.10.0",
+    "cors": "^2.8.5"
+  }
+}

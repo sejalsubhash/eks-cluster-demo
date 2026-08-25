@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DR Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+  input { display: block; margin: 8px 0; padding: 6px; width: 100%; box-sizing: border-box; }
+  button { padding: 8px 16px; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+  #region-banner { padding: 8px; margin-bottom: 16px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h1>DR Demo App</h1>
+  <div id="region-banner">Backend URL: <span id="backend-url"></span></div>
+
+  <h3>Add Customer</h3>
+  <input id="name" placeholder="Name" />
+  <input id="email" placeholder="Email" />
+  <button onclick="addCustomer()">Add</button>
+
+  <h3>Customers</h3>
+  <table id="customers-table">
+    <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Created At</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+  // Backend URL is injected at container start via env substitution (see nginx setup),
+  // or defaults to same-origin /api if you put a reverse proxy in front.
+  const BACKEND_URL = '__BACKEND_URL__';
+  document.getElementById('backend-url').textContent = BACKEND_URL;
+
+  async function loadCustomers() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/customers`);
+      const data = await res.json();
+      const tbody = document.querySelector('#customers-table tbody');
+      tbody.innerHTML = '';
+      data.forEach(c => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${c.id}</td><td>${c.name}</td><td>${c.email}</td><td>${c.created_at}</td>`;
+        tbody.appendChild(row);
+      });
+    } catch (err) {
+      console.error('Failed to load customers', err);
+    }
+  }
+
+  async function addCustomer() {
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    if (!name || !email) return alert('Name and email required');
+    await fetch(`${BACKEND_URL}/customers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    document.getElementById('name').value = '';
+    document.getElementById('email').value = '';
+    loadCustomers();
+  }
+
+  loadCustomers();
+</script>
+</body>
+</html>
