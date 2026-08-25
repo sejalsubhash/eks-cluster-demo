@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
 env:
-  AWS_REGION: ap-south-1
+  AWS_REGION_MUMBAI: ap-south-1
+  AWS_REGION_OHIO: us-east-2
+
   BACKEND_REPO: dr-demo-backend
   FRONTEND_REPO: dr-demo-frontend
 
@@ -16,37 +19,133 @@ permissions:
   contents: read
 
 jobs:
+
   build-and-push:
+
     runs-on: ubuntu-latest
 
     steps:
+
+      # 1. Checkout source code
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # 2. Configure AWS credentials
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION_MUMBAI }}
 
+
+      # 3. Verify AWS authentication
       - name: Test AWS authentication
         run: |
           aws sts get-caller-identity
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push backend image
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+      # 4. Get AWS Account ID
+      - name: Get AWS Account ID
+        id: account
         run: |
-          docker build -t $ECR_REGISTRY/$BACKEND_REPO:latest ./backend
-          docker push $ECR_REGISTRY/$BACKEND_REPO:latest
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
 
-      - name: Build and push frontend image
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+
+      # 5. Login to Mumbai ECR
+      - name: Login to Mumbai ECR
         run: |
-          docker build -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
-          docker push $ECR_REGISTRY/$FRONTEND_REPO:latest
+          aws ecr get-login-password \
+            --region $AWS_REGION_MUMBAI | \
+          docker login \
+            --username AWS \
+            --password-stdin \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_MUMBAI.amazonaws.com
+
+
+      # 6. Login to Ohio ECR
+      - name: Login to Ohio ECR
+        run: |
+          aws ecr get-login-password \
+            --region $AWS_REGION_OHIO | \
+          docker login \
+            --username AWS \
+            --password-stdin \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_OHIO.amazonaws.com
+
+
+      # 7. Build backend
+      - name: Build backend image
+        run: |
+          docker build \
+            -t $BACKEND_REPO:latest \
+            ./backend
+
+
+      # 8. Build frontend
+      - name: Build frontend image
+        run: |
+          docker build \
+            -t $FRONTEND_REPO:latest \
+            ./frontend
+
+
+      # 9. Tag backend for Mumbai
+      - name: Tag backend for Mumbai
+        run: |
+          docker tag \
+            $BACKEND_REPO:latest \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_MUMBAI.amazonaws.com/$BACKEND_REPO:latest
+
+
+      # 10. Tag backend for Ohio
+      - name: Tag backend for Ohio
+        run: |
+          docker tag \
+            $BACKEND_REPO:latest \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_OHIO.amazonaws.com/$BACKEND_REPO:latest
+
+
+      # 11. Tag frontend for Mumbai
+      - name: Tag frontend for Mumbai
+        run: |
+          docker tag \
+            $FRONTEND_REPO:latest \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_MUMBAI.amazonaws.com/$FRONTEND_REPO:latest
+
+
+      # 12. Tag frontend for Ohio
+      - name: Tag frontend for Ohio
+        run: |
+          docker tag \
+            $FRONTEND_REPO:latest \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_OHIO.amazonaws.com/$FRONTEND_REPO:latest
+
+
+      # 13. Push backend to Mumbai
+      - name: Push backend to Mumbai ECR
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_MUMBAI.amazonaws.com/$BACKEND_REPO:latest
+
+
+      # 14. Push frontend to Mumbai
+      - name: Push frontend to Mumbai ECR
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_MUMBAI.amazonaws.com/$FRONTEND_REPO:latest
+
+
+      # 15. Push backend to Ohio
+      - name: Push backend to Ohio ECR
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_OHIO.amazonaws.com/$BACKEND_REPO:latest
+
+
+      # 16. Push frontend to Ohio
+      - name: Push frontend to Ohio ECR
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION_OHIO.amazonaws.com/$FRONTEND_REPO:latest
